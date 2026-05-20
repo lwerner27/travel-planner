@@ -22,20 +22,43 @@ export async function GET({ url, locals }) {
 
 	await checkTripOwnership(tripId, locals.user.uid);
 
-	const snapshot = await adminDb
-		.collection('trips')
-		.doc(tripId)
-		.collection('events')
-		.where('date', '==', date)
-		.orderBy('time', 'asc')
-		.get();
+	try {
+		const snapshot = await adminDb
+			.collection('trips')
+			.doc(tripId)
+			.collection('events')
+			.where('date', '==', date)
+			.orderBy('time', 'asc')
+			.get();
 
-	const events = snapshot.docs.map((doc) => ({
-		id: doc.id,
-		...doc.data()
-	}));
+		const events = snapshot.docs.map((doc) => ({
+			id: doc.id,
+			...doc.data()
+		}));
 
-	return json(events);
+		return json(events);
+	} catch (err) {
+		console.error('Error fetching events:', err);
+		// Fallback for missing index
+		if (err instanceof Error && err.message.includes('FAILED_PRECONDITION')) {
+			console.warn('Firestore index required for events orderBy. Falling back to manual sort.');
+			const fallbackSnapshot = await adminDb
+				.collection('trips')
+				.doc(tripId)
+				.collection('events')
+				.where('date', '==', date)
+				.get();
+
+			const events = fallbackSnapshot.docs.map((doc) => ({
+				id: doc.id,
+				...doc.data()
+			})) as any[];
+
+			events.sort((a, b) => ((a.time || '') > (b.time || '') ? 1 : -1));
+			return json(events);
+		}
+		throw error(500, 'Failed to fetch events');
+	}
 }
 
 export async function POST({ request, locals }) {

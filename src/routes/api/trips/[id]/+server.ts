@@ -1,5 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import { adminDb, adminStorage } from '$lib/server/firebase-admin';
+import { PUBLIC_FIREBASE_STORAGE_BUCKET } from '$env/static/public';
 
 export async function GET({ params, locals }) {
 	if (!locals.user) {
@@ -49,7 +50,7 @@ export async function DELETE({ params, locals }) {
 					const data = attachDoc.data();
 					if (data.storagePath) {
 						try {
-							await adminStorage.bucket().file(data.storagePath).delete();
+							await adminStorage.bucket(PUBLIC_FIREBASE_STORAGE_BUCKET).file(data.storagePath).delete();
 						} catch (e) {
 							console.error('Error deleting attachment file:', e);
 						}

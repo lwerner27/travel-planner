@@ -1,5 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import { adminDb, adminStorage } from '$lib/server/firebase-admin';
+import { PUBLIC_FIREBASE_STORAGE_BUCKET } from '$env/static/public';
 
 async function checkTripOwnership(tripId: string, userId: string) {
 	const doc = await adminDb.collection('trips').doc(tripId).get();
@@ -22,19 +23,24 @@ export async function GET({ url, locals }) {
 
 	await checkTripOwnership(tripId, locals.user.uid);
 
-	const snapshot = await adminDb
-		.collection('trips')
-		.doc(tripId)
-		.collection('attachments')
-		.where('date', '==', date)
-		.get();
+	try {
+		const snapshot = await adminDb
+			.collection('trips')
+			.doc(tripId)
+			.collection('attachments')
+			.where('date', '==', date)
+			.get();
 
-	const attachments = snapshot.docs.map((doc) => ({
-		id: doc.id,
-		...doc.data()
-	}));
+		const attachments = snapshot.docs.map((doc) => ({
+			id: doc.id,
+			...doc.data()
+		}));
 
-	return json(attachments);
+		return json(attachments);
+	} catch (err) {
+		console.error('Error fetching attachments:', err);
+		throw error(500, 'Failed to fetch attachments');
+	}
 }
 
 export async function POST({ request, locals }) {
@@ -62,11 +68,15 @@ export async function POST({ request, locals }) {
 
 	// Create a unique filename to avoid collisions
 	const fileId = Math.random().toString(36).substr(2, 9);
-	const safeFileName = `attachments/${tripId}/${fileId}-${fileName}`;
+	const storagePath = `attachments/${tripId}/${fileId}-${fileName}`;
 	
 	try {
-		const bucket = adminStorage.bucket();
-		const blob = bucket.file(safeFileName);
+		// Explicitly use the bucket name from environment variables
+		const bucket = adminStorage.bucket(PUBLIC_FIREBASE_STORAGE_BUCKET);
+		
+		console.log('Attempting upload to bucket:', bucket.name);
+
+		const blob = bucket.file(storagePath);
 		const arrayBuffer = await file.arrayBuffer();
 		const buffer = Buffer.from(arrayBuffer);
 
@@ -74,11 +84,11 @@ export async function POST({ request, locals }) {
 			metadata: { contentType: mimeType }
 		});
 
-		// Make the file public (optional, depending on security needs)
+		// Make the file public
 		await blob.makePublic();
 
-		// Construct the public URL
-		const fileUrl = `https://storage.googleapis.com/${bucket.name}/${safeFileName}`;
+		// Construct the public URL manually
+		const fileUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
 
 		const attachmentData = {
 			tripId,
@@ -86,7 +96,7 @@ export async function POST({ request, locals }) {
 			fileName,
 			mimeType,
 			fileUrl,
-			storagePath: safeFileName // Store the path for easier deletion
+			storagePath
 		};
 
 		const docRef = await adminDb
@@ -98,6 +108,6 @@ export async function POST({ request, locals }) {
 		return json({ id: docRef.id, ...attachmentData });
 	} catch (err) {
 		console.error('Error during attachment creation:', err);
-		throw error(500, 'Failed to create attachment');
+		throw error(500, `Failed to create attachment: ${err instanceof Error ? err.message : 'Unknown error'}`);
 	}
 }
