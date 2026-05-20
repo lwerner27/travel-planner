@@ -1,14 +1,5 @@
 import { json, error } from '@sveltejs/kit';
-import { adminDb } from '$lib/server/firebase-admin';
-import fs from 'node:fs';
-import path from 'node:path';
-
-const UPLOADS_DIR = path.resolve('uploads');
-
-// Ensure uploads directory exists
-if (!fs.existsSync(UPLOADS_DIR)) {
-	fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
+import { adminDb, adminStorage } from '$lib/server/firebase-admin';
 
 async function checkTripOwnership(tripId: string, userId: string) {
 	const doc = await adminDb.collection('trips').doc(tripId).get();
@@ -71,23 +62,31 @@ export async function POST({ request, locals }) {
 
 	// Create a unique filename to avoid collisions
 	const fileId = Math.random().toString(36).substr(2, 9);
-	const safeFileName = `${fileId}-${fileName}`;
-	const filePath = path.join(UPLOADS_DIR, safeFileName);
+	const safeFileName = `attachments/${tripId}/${fileId}-${fileName}`;
 	
 	try {
-		// Write file to disk (Temporary, will be moved to Firebase Storage in Phase 4)
+		const bucket = adminStorage.bucket();
+		const blob = bucket.file(safeFileName);
 		const arrayBuffer = await file.arrayBuffer();
 		const buffer = Buffer.from(arrayBuffer);
-		fs.writeFileSync(filePath, buffer);
 
-		const fileUrl = `/files/${safeFileName}`;
+		await blob.save(buffer, {
+			metadata: { contentType: mimeType }
+		});
+
+		// Make the file public (optional, depending on security needs)
+		await blob.makePublic();
+
+		// Construct the public URL
+		const fileUrl = `https://storage.googleapis.com/${bucket.name}/${safeFileName}`;
 
 		const attachmentData = {
 			tripId,
 			date,
 			fileName,
 			mimeType,
-			fileUrl
+			fileUrl,
+			storagePath: safeFileName // Store the path for easier deletion
 		};
 
 		const docRef = await adminDb
@@ -99,8 +98,6 @@ export async function POST({ request, locals }) {
 		return json({ id: docRef.id, ...attachmentData });
 	} catch (err) {
 		console.error('Error during attachment creation:', err);
-		// Cleanup file on error
-		if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 		throw error(500, 'Failed to create attachment');
 	}
 }

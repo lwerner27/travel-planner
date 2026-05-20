@@ -1,5 +1,5 @@
 import { json, error } from '@sveltejs/kit';
-import { adminDb } from '$lib/server/firebase-admin';
+import { adminDb, adminStorage } from '$lib/server/firebase-admin';
 
 export async function GET({ params, locals }) {
 	if (!locals.user) {
@@ -39,11 +39,24 @@ export async function DELETE({ params, locals }) {
 		}
 
 		// Delete subcollections (events, locations, attachments)
-		// Note: For a production app, you might want to use a more robust way to delete subcollections
-		// but for this prototype, we'll do it manually.
 		const subcollections = ['events', 'locations', 'attachments'];
 		for (const sub of subcollections) {
 			const subSnapshot = await tripRef.collection(sub).get();
+			
+			if (sub === 'attachments') {
+				// Delete files from storage
+				for (const attachDoc of subSnapshot.docs) {
+					const data = attachDoc.data();
+					if (data.storagePath) {
+						try {
+							await adminStorage.bucket().file(data.storagePath).delete();
+						} catch (e) {
+							console.error('Error deleting attachment file:', e);
+						}
+					}
+				}
+			}
+
 			const batch = adminDb.batch();
 			subSnapshot.docs.forEach((d) => batch.delete(d.ref));
 			await batch.commit();
