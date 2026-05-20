@@ -6,18 +6,41 @@ export async function GET({ locals }) {
 		throw error(401, 'Unauthorized');
 	}
 
-	const snapshot = await adminDb
-		.collection('trips')
-		.where('userId', '==', locals.user.uid)
-		.orderBy('startDate', 'asc')
-		.get();
+	try {
+		const snapshot = await adminDb
+			.collection('trips')
+			.where('userId', '==', locals.user.uid)
+			.orderBy('startDate', 'asc')
+			.get();
 
-	const trips = snapshot.docs.map((doc) => ({
-		id: doc.id,
-		...doc.data()
-	}));
+		const trips = snapshot.docs.map((doc) => ({
+			id: doc.id,
+			...doc.data()
+		}));
 
-	return json(trips);
+		return json(trips);
+	} catch (err) {
+		console.error('Error fetching trips:', err);
+		// If the error is due to a missing index, we should still return an empty array or handle it
+		if (err instanceof Error && err.message.includes('FAILED_PRECONDITION')) {
+			console.warn('Firestore index required for orderBy. Falling back to un-ordered fetch.');
+			const fallbackSnapshot = await adminDb
+				.collection('trips')
+				.where('userId', '==', locals.user.uid)
+				.get();
+			
+			const trips = fallbackSnapshot.docs.map((doc) => ({
+				id: doc.id,
+				...doc.data()
+			})) as any[];
+
+			// Manual sort
+			trips.sort((a, b) => (a.startDate > b.startDate ? 1 : -1));
+			
+			return json(trips);
+		}
+		throw error(500, 'Failed to fetch trips');
+	}
 }
 
 export async function POST({ request, locals }) {

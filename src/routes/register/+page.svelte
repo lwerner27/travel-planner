@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { ChevronLeft, Mail, Lock, Loader2, UserPlus } from 'lucide-svelte';
 	import { fly } from 'svelte/transition';
 	import { auth } from '$lib/firebase/client';
