@@ -1,5 +1,5 @@
 import { json, error } from '@sveltejs/kit';
-import { prisma } from '$lib/server/prisma';
+import { adminDb } from '$lib/server/firebase-admin';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -11,10 +11,10 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 async function checkTripOwnership(tripId: string, userId: string) {
-	const trip = await prisma.trip.findUnique({
-		where: { id: tripId, userId }
-	});
-	if (!trip) throw error(403, 'Forbidden');
+	const doc = await adminDb.collection('trips').doc(tripId).get();
+	if (!doc.exists || doc.data()?.userId !== userId) {
+		throw error(403, 'Forbidden');
+	}
 }
 
 export async function GET({ url, locals }) {
@@ -29,11 +29,19 @@ export async function GET({ url, locals }) {
 	const date = parts.slice(-3).join('-');
 	const tripId = parts.slice(0, -3).join('-');
 
-	await checkTripOwnership(tripId, locals.user.id);
+	await checkTripOwnership(tripId, locals.user.uid);
 
-	const attachments = await prisma.attachment.findMany({
-		where: { tripId, date }
-	});
+	const snapshot = await adminDb
+		.collection('trips')
+		.doc(tripId)
+		.collection('attachments')
+		.where('date', '==', date)
+		.get();
+
+	const attachments = snapshot.docs.map((doc) => ({
+		id: doc.id,
+		...doc.data()
+	}));
 
 	return json(attachments);
 }
@@ -59,7 +67,7 @@ export async function POST({ request, locals }) {
 	const date = parts.slice(-3).join('-');
 	const tripId = parts.slice(0, -3).join('-');
 
-	await checkTripOwnership(tripId, locals.user.id);
+	await checkTripOwnership(tripId, locals.user.uid);
 
 	// Create a unique filename to avoid collisions
 	const fileId = Math.random().toString(36).substr(2, 9);
@@ -67,24 +75,28 @@ export async function POST({ request, locals }) {
 	const filePath = path.join(UPLOADS_DIR, safeFileName);
 	
 	try {
-		// Write file to disk
+		// Write file to disk (Temporary, will be moved to Firebase Storage in Phase 4)
 		const arrayBuffer = await file.arrayBuffer();
 		const buffer = Buffer.from(arrayBuffer);
 		fs.writeFileSync(filePath, buffer);
 
-		// The URL will be served by a dedicated route: /files/[filename]
 		const fileUrl = `/files/${safeFileName}`;
 
-		const attachment = await prisma.attachment.create({
-			data: {
-				tripId,
-				date,
-				fileName,
-				mimeType,
-				fileUrl
-			}
-		});
-		return json(attachment);
+		const attachmentData = {
+			tripId,
+			date,
+			fileName,
+			mimeType,
+			fileUrl
+		};
+
+		const docRef = await adminDb
+			.collection('trips')
+			.doc(tripId)
+			.collection('attachments')
+			.add(attachmentData);
+
+		return json({ id: docRef.id, ...attachmentData });
 	} catch (err) {
 		console.error('Error during attachment creation:', err);
 		// Cleanup file on error

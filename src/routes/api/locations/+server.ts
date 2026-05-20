@@ -1,11 +1,11 @@
 import { json, error } from '@sveltejs/kit';
-import { prisma } from '$lib/server/prisma';
+import { adminDb } from '$lib/server/firebase-admin';
 
 async function checkTripOwnership(tripId: string, userId: string) {
-	const trip = await prisma.trip.findUnique({
-		where: { id: tripId, userId }
-	});
-	if (!trip) throw error(403, 'Forbidden');
+	const doc = await adminDb.collection('trips').doc(tripId).get();
+	if (!doc.exists || doc.data()?.userId !== userId) {
+		throw error(403, 'Forbidden');
+	}
 }
 
 export async function GET({ url, locals }) {
@@ -20,11 +20,19 @@ export async function GET({ url, locals }) {
 	const date = parts.slice(-3).join('-');
 	const tripId = parts.slice(0, -3).join('-');
 
-	await checkTripOwnership(tripId, locals.user.id);
+	await checkTripOwnership(tripId, locals.user.uid);
 
-	const locations = await prisma.location.findMany({
-		where: { tripId, date }
-	});
+	const snapshot = await adminDb
+		.collection('trips')
+		.doc(tripId)
+		.collection('locations')
+		.where('date', '==', date)
+		.get();
+
+	const locations = snapshot.docs.map((doc) => ({
+		id: doc.id,
+		...doc.data()
+	}));
 
 	return json(locations);
 }
@@ -42,18 +50,22 @@ export async function POST({ request, locals }) {
 	const date = parts.slice(-3).join('-');
 	const tripId = parts.slice(0, -3).join('-');
 
-	await checkTripOwnership(tripId, locals.user.id);
+	await checkTripOwnership(tripId, locals.user.uid);
 
 	try {
-		const location = await prisma.location.create({
-			data: {
-				tripId,
-				date,
-				name,
-				address
-			}
-		});
-		return json(location);
+		const locationData = {
+			tripId,
+			date,
+			name,
+			address
+		};
+		const docRef = await adminDb
+			.collection('trips')
+			.doc(tripId)
+			.collection('locations')
+			.add(locationData);
+
+		return json({ id: docRef.id, ...locationData });
 	} catch (err) {
 		console.error('Error creating location:', err);
 		throw error(500, 'Failed to create location');

@@ -1,15 +1,22 @@
 import { json, error } from '@sveltejs/kit';
-import { prisma } from '$lib/server/prisma';
+import { adminDb } from '$lib/server/firebase-admin';
 
 export async function GET({ locals }) {
 	if (!locals.user) {
 		throw error(401, 'Unauthorized');
 	}
 
-	const trips = await prisma.trip.findMany({
-		where: { userId: locals.user.id },
-		orderBy: { startDate: 'asc' }
-	});
+	const snapshot = await adminDb
+		.collection('trips')
+		.where('userId', '==', locals.user.uid)
+		.orderBy('startDate', 'asc')
+		.get();
+
+	const trips = snapshot.docs.map((doc) => ({
+		id: doc.id,
+		...doc.data()
+	}));
+
 	return json(trips);
 }
 
@@ -20,14 +27,15 @@ export async function POST({ request, locals }) {
 
 	const { title, startDate, endDate } = await request.json();
 
-	const trip = await prisma.trip.create({
-		data: {
-			userId: locals.user.id,
-			title,
-			startDate: new Date(startDate + 'T00:00:00'),
-			endDate: new Date(endDate + 'T00:00:00')
-		}
-	});
+	const tripData = {
+		userId: locals.user.uid,
+		title,
+		startDate: new Date(startDate + 'T00:00:00').toISOString(),
+		endDate: new Date(endDate + 'T00:00:00').toISOString()
+	};
+
+	const docRef = await adminDb.collection('trips').add(tripData);
+	const trip = { id: docRef.id, ...tripData };
 
 	return json(trip);
 }

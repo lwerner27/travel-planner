@@ -1,9 +1,5 @@
 import { json, error } from '@sveltejs/kit';
-import { prisma } from '$lib/server/prisma';
-import fs from 'node:fs';
-import path from 'node:path';
-
-const UPLOADS_DIR = path.resolve('uploads');
+import { adminDb } from '$lib/server/firebase-admin';
 
 export async function GET({ params, locals }) {
 	if (!locals.user) {
@@ -13,15 +9,13 @@ export async function GET({ params, locals }) {
 	const { id } = params;
 
 	try {
-		const trip = await prisma.trip.findUnique({
-			where: { id, userId: locals.user.id }
-		});
+		const doc = await adminDb.collection('trips').doc(id).get();
 
-		if (!trip) {
+		if (!doc.exists || doc.data()?.userId !== locals.user.uid) {
 			throw error(404, 'Trip not found');
 		}
 
-		return json(trip);
+		return json({ id: doc.id, ...doc.data() });
 	} catch (err) {
 		console.error('Error fetching trip:', err);
 		if ((err as any).status) throw err;
@@ -37,31 +31,26 @@ export async function DELETE({ params, locals }) {
 	const { id } = params;
 
 	try {
-		// 1. Verify ownership and get attachments
-		const trip = await prisma.trip.findUnique({
-			where: { id, userId: locals.user.id },
-			include: { attachments: true }
-		});
+		const tripRef = adminDb.collection('trips').doc(id);
+		const doc = await tripRef.get();
 
-		if (!trip) {
+		if (!doc.exists || doc.data()?.userId !== locals.user.uid) {
 			throw error(404, 'Trip not found');
 		}
 
-		// 2. Delete physical files for attachments
-		for (const attachment of trip.attachments) {
-			const filename = attachment.fileUrl.split('/files/')[1];
-			if (filename) {
-				const filePath = path.join(UPLOADS_DIR, filename);
-				if (fs.existsSync(filePath)) {
-					fs.unlinkSync(filePath);
-				}
-			}
+		// Delete subcollections (events, locations, attachments)
+		// Note: For a production app, you might want to use a more robust way to delete subcollections
+		// but for this prototype, we'll do it manually.
+		const subcollections = ['events', 'locations', 'attachments'];
+		for (const sub of subcollections) {
+			const subSnapshot = await tripRef.collection(sub).get();
+			const batch = adminDb.batch();
+			subSnapshot.docs.forEach((d) => batch.delete(d.ref));
+			await batch.commit();
 		}
 
-		// 3. Delete trip from database (Cascade will handle record cleanup)
-		await prisma.trip.delete({
-			where: { id }
-		});
+		// Delete the trip document itself
+		await tripRef.delete();
 
 		return json({ success: true });
 	} catch (err) {

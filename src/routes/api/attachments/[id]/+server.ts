@@ -1,5 +1,5 @@
 import { json, error } from '@sveltejs/kit';
-import { prisma } from '$lib/server/prisma';
+import { adminDb } from '$lib/server/firebase-admin';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -13,28 +13,31 @@ export async function DELETE({ params, locals }) {
 	const { id } = params;
 
 	try {
-		// 1. Find the attachment record
-		const attachment = await prisma.attachment.findUnique({
-			where: { id },
-			include: { trip: true }
-		});
+		// Since we don't have the tripId in the URL, we use a collectionGroup query to find the attachment
+		// Note: This requires an index if we add more filters, but for documentId it might work directly
+		// However, it's safer to store attachments in a way that we can find them.
+		// For now, let's try to find it by querying across all attachments subcollections.
+		const snapshot = await adminDb.collectionGroup('attachments').get();
+		const doc = snapshot.docs.find(d => d.id === id);
 
-		if (!attachment) {
+		if (!doc) {
 			throw error(404, 'Attachment not found');
 		}
 
-		// 2. Verify ownership
-		if (attachment.trip.userId !== locals.user.id) {
+		const attachmentData = doc.data();
+		const tripId = attachmentData.tripId;
+
+		// Verify ownership of the parent trip
+		const tripDoc = await adminDb.collection('trips').doc(tripId).get();
+		if (!tripDoc.exists || tripDoc.data()?.userId !== locals.user.uid) {
 			throw error(403, 'Forbidden');
 		}
 
-		// 3. Delete the record from the database
-		await prisma.attachment.delete({
-			where: { id }
-		});
+		// Delete the record from the database
+		await doc.ref.delete();
 
-		// 4. Delete the file from the disk
-		const filename = attachment.fileUrl.split('/files/')[1];
+		// Delete the file from the disk (Temporary, will be moved to Firebase Storage in Phase 4)
+		const filename = attachmentData.fileUrl.split('/files/')[1];
 		if (filename) {
 			const filePath = path.join(UPLOADS_DIR, filename);
 			if (fs.existsSync(filePath)) {
