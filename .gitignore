@@ -30,3 +30,6 @@ dev.db-journal
 uploads/
 
 /../generated/prisma
+
+# Deployment
+DEPLOYMENT_CHECKLIST.md
