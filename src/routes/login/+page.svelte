@@ -1,10 +1,42 @@
 <script>
 	import { ChevronLeft, Mail, Lock, Loader2, LogIn } from 'lucide-svelte';
 	import { fly } from 'svelte/transition';
-	import { enhance } from '$app/forms';
+	import { auth } from '$lib/firebase/client';
+	import { signInWithEmailAndPassword } from 'firebase/auth';
+	import { goto } from '$app/navigation';
 
-	export let form;
+	let email = '';
+	let password = '';
+	let message = '';
 	let submitting = false;
+
+	async function handleLogin() {
+		submitting = true;
+		message = '';
+		try {
+			const userCredential = await signInWithEmailAndPassword(auth, email, password);
+			const idToken = await userCredential.user.getIdToken();
+
+			const response = await fetch('/api/session', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ idToken })
+			});
+
+			if (response.ok) {
+				await goto('/', { invalidateAll: true });
+			} else {
+				message = 'Failed to create session';
+			}
+		} catch (error) {
+			console.error('Login error:', error);
+			message = 'Incorrect email or password';
+		} finally {
+			submitting = false;
+		}
+	}
 </script>
 
 <div class="min-h-screen bg-slate-50 p-6 flex flex-col justify-center">
@@ -14,20 +46,13 @@
 
 	<main class="max-w-md mx-auto w-full" in:fly={{ y: 20 }}>
 		<form 
-			method="POST" 
-			use:enhance={() => {
-				submitting = true;
-				return async ({ update }) => {
-					submitting = false;
-					await update();
-				};
-			}} 
+			on:submit|preventDefault={handleLogin}
 			class="space-y-8"
 		>
 			<div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-50 space-y-6">
-				{#if form?.message}
+				{#if message}
 					<p class="text-red-500 text-xs font-bold text-center bg-red-50 py-3 rounded-2xl border border-red-100 italic">
-						{form.message}
+						{message}
 					</p>
 				{/if}
 
@@ -40,7 +65,7 @@
 						<input 
 							type="email" 
 							id="email" 
-							name="email"
+							bind:value={email}
 							placeholder="you@example.com" 
 							class="w-full pl-11 pr-4 py-4 bg-slate-50 border border-transparent rounded-2xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300"
 							required
@@ -57,7 +82,7 @@
 						<input 
 							type="password" 
 							id="password" 
-							name="password"
+							bind:value={password}
 							placeholder="••••••••" 
 							class="w-full pl-11 pr-4 py-4 bg-slate-50 border border-transparent rounded-2xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300"
 							required
