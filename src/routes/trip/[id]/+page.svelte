@@ -19,7 +19,8 @@
     ExternalLink,
     X,
     Info,
-    Paperclip
+    Paperclip,
+    Pencil
   } from 'lucide-svelte';
   
   $: id = $page.params.id;
@@ -302,6 +303,13 @@
             <h3 class="text-3xl font-black text-slate-900 leading-tight break-words">{selectedEvent.title}</h3>
           </div>
           <div class="flex items-center gap-2">
+            <a 
+              href="/trip/{id}/edit-event/{selectedEvent?.id}"
+              class="p-3 bg-indigo-50 rounded-2xl text-indigo-400 hover:text-indigo-600 hover:bg-indigo-100 transition-colors"
+              title="Edit Event"
+            >
+              <Pencil size={20} />
+            </a>
             <button 
               on:click={() => handleDeleteEvent(selectedEvent?.id || '')}
               disabled={deletingEventId === selectedEvent?.id}
@@ -343,14 +351,13 @@
                 <a 
                   href="https://www.google.com/maps/search/?api=1&query={encodeURIComponent(selectedEvent.location.address || '')}"
                   target="_blank"
-                  class="flex-1 flex items-start gap-4 p-5 bg-white rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-100 transition-colors group"
+                  class="flex-1 flex items-center gap-4 p-5 bg-white rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-100 transition-colors group"
                 >
                   <div class="p-2.5 bg-rose-50 rounded-2xl text-rose-500 group-hover:bg-rose-100 transition-colors">
                     <MapPin size={20} />
                   </div>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-black text-slate-800 break-words leading-tight">{selectedEvent.location.address}</p>
-                    <p class="text-[10px] font-black text-indigo-500 uppercase tracking-widest mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">Open in Maps</p>
                   </div>
                 </a>
                 <button 

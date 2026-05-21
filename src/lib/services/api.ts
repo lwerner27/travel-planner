@@ -92,6 +92,34 @@ export const api = {
     return res.json();
   },
 
+  updateEvent: async (
+    id: string,
+    event: Partial<Omit<Event, 'id' | 'attachments' | 'location'>> & { 
+      location?: Omit<Location, 'id' | 'eventId'> 
+    }, 
+    files?: File[]
+  ): Promise<Event> => {
+    const formData = new FormData();
+    if (event.title) formData.append('title', event.title);
+    if (event.time !== undefined) formData.append('time', event.time || '');
+    if (event.description !== undefined) formData.append('description', event.description || '');
+    if (event.location) {
+      formData.append('location', JSON.stringify(event.location));
+    }
+    
+    if (files) {
+      files.forEach((file) => {
+        formData.append('files', file);
+      });
+    }
+
+    const res = await fetch(`/api/events/${id}`, {
+      method: 'PATCH',
+      body: formData
+    });
+    return res.json();
+  },
+
   getAttachments: async (eventId: string): Promise<Attachment[]> => {
     const res = await fetch(`/api/attachments?eventId=${eventId}`);
     return res.json();
