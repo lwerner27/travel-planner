@@ -12,17 +12,20 @@ export const tripSchema = z.object({
 export const eventSchema = z.object({
 	dayId: z.string().min(1),
 	title: z.string().min(1, 'Title is required').max(100),
-	time: z.string().optional(),
-	description: z.string().optional(),
+	time: z.string().optional().or(z.literal('')),
+	description: z.string().optional().or(z.literal('')),
 	location: z.object({
-		name: z.string().min(1, 'Name is required').max(100),
-		address: z.string().min(1, 'Address is required')
-	}).optional()
+		name: z.string().optional().or(z.literal('')),
+		address: z.string().optional().or(z.literal(''))
+	}).optional().refine(data => !data || data.name || data.address, {
+		message: "Location must have either a name or an address",
+		path: ["name"]
+	})
 });
 
 export const locationSchema = z.object({
 	eventId: z.string().min(1),
-	name: z.string().min(1, 'Name is required').max(100),
+	name: z.string().optional().or(z.literal('')),
 	address: z.string().min(1, 'Address is required')
 });
 

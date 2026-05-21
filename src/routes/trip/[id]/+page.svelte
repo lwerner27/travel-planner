@@ -16,7 +16,10 @@
     MoreHorizontal,
     Trash2,
     Loader2,
-    ExternalLink
+    ExternalLink,
+    X,
+    Info,
+    Paperclip
   } from 'lucide-svelte';
   
   $: id = $page.params.id;
@@ -28,7 +31,12 @@
   let events: Event[] = [];
   let loadingEvents = false;
   let deletingAttachmentId: string | null = null;
+  let deletingEventId: string | null = null;
+  let deletingLocationId: string | null = null;
   let deletingTrip = false;
+  
+  // State for event detail view
+  let selectedEvent: Event | null = null;
 
   $: selectedDate = days[selectedDayIndex] ? formatDate(days[selectedDayIndex]) : null;
 
@@ -39,6 +47,11 @@
     const dayId = `${id}-${date}`;
     try {
       events = await api.getEvents(dayId);
+      // Refresh selectedEvent if it's currently open
+      if (selectedEvent) {
+        const updated = events.find(e => e.id === selectedEvent?.id);
+        selectedEvent = updated || null;
+      }
     } catch (err) {
       console.error('Error fetching day data:', err);
     }
@@ -52,13 +65,43 @@
     deletingAttachmentId = attachmentId;
     try {
       await api.deleteAttachment(attachmentId);
-      // Re-fetch to update the nested state
       await fetchDayData(selectedDate);
     } catch (e) {
       alert('Failed to delete file');
       console.error(e);
     } finally {
       deletingAttachmentId = null;
+    }
+  }
+
+  async function handleDeleteEvent(eventId: string) {
+    if (!confirm('Are you sure you want to delete this event and all its attachments?')) return;
+    
+    deletingEventId = eventId;
+    try {
+      await api.deleteEvent(eventId);
+      if (selectedEvent?.id === eventId) selectedEvent = null;
+      await fetchDayData(selectedDate);
+    } catch (e) {
+      alert('Failed to delete event');
+      console.error(e);
+    } finally {
+      deletingEventId = null;
+    }
+  }
+
+  async function handleDeleteLocation(locationId: string) {
+    if (!confirm('Are you sure you want to remove the location from this event?')) return;
+    
+    deletingLocationId = locationId;
+    try {
+      await api.deleteLocation(locationId);
+      await fetchDayData(selectedDate);
+    } catch (e) {
+      alert('Failed to delete location');
+      console.error(e);
+    } finally {
+      deletingLocationId = null;
     }
   }
 
@@ -74,6 +117,14 @@
       console.error(e);
       deletingTrip = false;
     }
+  }
+
+  function openEventDetails(event: Event) {
+    selectedEvent = event;
+  }
+
+  function closeEventDetails() {
+    selectedEvent = null;
   }
 
   $: if (selectedDate) fetchDayData(selectedDate);
@@ -166,12 +217,12 @@
           </a>
         </div>
 
-        <div class="space-y-6">
+        <div class="space-y-4">
           {#if loadingEvents}
             {#each Array(3) as _}
-              <div class="p-6 bg-slate-50 rounded-3xl animate-pulse space-y-3">
-                <div class="h-4 bg-slate-200 rounded w-1/4"></div>
-                <div class="h-6 bg-slate-200 rounded w-3/4"></div>
+              <div class="p-5 bg-slate-50 rounded-2xl animate-pulse flex items-center gap-4">
+                <div class="h-4 bg-slate-200 rounded w-12"></div>
+                <div class="h-5 bg-slate-200 rounded w-full"></div>
               </div>
             {/each}
           {:else if events.length === 0}
@@ -183,72 +234,187 @@
           {:else}
             {#each events as event (event.id)}
               <div class="relative group" transition:slide>
-                <div class="p-6 bg-slate-50 rounded-[2rem] border border-white shadow-sm hover:shadow-md transition-shadow">
-                  <div class="flex justify-between items-start mb-4">
-                    <div class="flex items-center gap-3">
-                      {#if event.time}
-                        <div class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-wider">
-                          {event.time}
-                        </div>
-                      {/if}
-                      <h4 class="text-lg font-black text-slate-800">{event.title}</h4>
-                    </div>
+                <button 
+                  on:click={() => openEventDetails(event)}
+                  class="w-full text-left p-5 bg-slate-50 rounded-2xl border border-white shadow-sm hover:border-indigo-100 hover:bg-indigo-50 transition-all flex items-center gap-4 active:scale-[0.98]" 
+                >
+                  {#if event.time}
+                    <span class="text-[10px] font-black text-indigo-600 bg-indigo-100 px-2 py-1 rounded-md whitespace-nowrap">
+                      {event.time}
+                    </span>
+                  {/if}
+                  <div class="flex-1 min-w-0 pr-8">
+                    <h4 class="font-black text-slate-800 truncate">{event.title}</h4>
                   </div>
-
-                  {#if event.description}
-                    <p class="text-sm text-slate-500 font-medium mb-4 leading-relaxed">
-                      {event.description}
-                    </p>
+                  <div class="flex items-center gap-2 text-slate-300">
+                    {#if event.location}
+                      <MapPin size={14} />
+                    {/if}
+                    {#if event.attachments && event.attachments.length > 0}
+                      <Paperclip size={14} />
+                    {/if}
+                    <ChevronLeft size={16} class="rotate-180 text-slate-400 ml-1" />
+                  </div>
+                </button>
+                
+                <!-- Event Delete Button -->
+                <button 
+                  on:click|stopPropagation={() => handleDeleteEvent(event.id)}
+                  disabled={deletingEventId === event.id}
+                  class="absolute right-12 top-1/2 -translate-y-1/2 p-2 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  title="Delete event"
+                >
+                  {#if deletingEventId === event.id}
+                    <Loader2 size={16} class="animate-spin" />
+                  {:else}
+                    <Trash2 size={16} />
                   {/if}
-
-                  {#if event.location}
-                    <div class="flex items-start gap-3 p-3 bg-white rounded-2xl border border-slate-100 mb-4">
-                      <div class="p-2 bg-rose-50 rounded-xl text-rose-500">
-                        <MapPin size={18} />
-                      </div>
-                      <div class="flex-1 min-w-0">
-                        <p class="text-xs font-black text-slate-800 truncate">{event.location.name}</p>
-                        <p class="text-[10px] text-slate-400 font-bold truncate">{event.location.address}</p>
-                      </div>
-                      <a 
-                        href="https://www.google.com/maps/search/?api=1&query={encodeURIComponent(event.location.address || event.location.name)}"
-                        target="_blank"
-                        class="p-2 text-slate-300 hover:text-indigo-500 transition-colors"
-                      >
-                        <ExternalLink size={16} />
-                      </a>
-                    </div>
-                  {/if}
-
-                  {#if event.attachments && event.attachments.length > 0}
-                    <div class="flex flex-wrap gap-2">
-                      {#each event.attachments as attachment (attachment.id)}
-                        <div class="flex items-center gap-2 bg-white border border-slate-100 pl-3 pr-2 py-2 rounded-xl group/file">
-                          <FileText size={14} class="text-indigo-400" />
-                          <a 
-                            href={attachment.fileUrl} 
-                            target="_blank" 
-                            class="text-[10px] font-black text-slate-600 truncate max-w-[120px] hover:text-indigo-600 transition-colors"
-                          >
-                            {attachment.fileName}
-                          </a>
-                          <button 
-                            on:click|preventDefault={() => handleDeleteAttachment(attachment.id)}
-                            class="p-1 text-slate-200 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      {/each}
-                    </div>
-                  {/if}
-                </div>
+                </button>
               </div>
             {/each}
           {/if}
         </div>
       </div>
     </main>
+  {/if}
+
+  <!-- Event Details Modal -->
+  {#if selectedEvent}
+    <!-- Backdrop -->
+    <button 
+      on:click={closeEventDetails} 
+      class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40" 
+      in:fade={{ duration: 200 }} 
+      out:fade={{ duration: 200 }}
+    ></button>
+    
+    <!-- Modal -->
+    <div 
+      class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-[3rem] shadow-2xl z-50 overflow-hidden" 
+      in:fly={{ y: 400, duration: 400 }} 
+      out:fly={{ y: 400, duration: 300 }}
+    >
+      <div class="p-8 pb-12">
+        <div class="flex justify-center mb-4">
+          <div class="w-12 h-1 bg-slate-100 rounded-full"></div>
+        </div>
+        
+        <div class="flex justify-between items-start mb-8">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-3 mb-2">
+              {#if selectedEvent.time}
+                <div class="px-3 py-1 bg-indigo-600 text-white rounded-full text-[10px] font-black uppercase tracking-wider">
+                  {selectedEvent.time}
+                </div>
+              {/if}
+              <p class="text-[10px] font-black uppercase tracking-widest text-indigo-500">{formatDisplayDate(days[selectedDayIndex])}</p>
+            </div>
+            <h3 class="text-3xl font-black text-slate-900 leading-tight break-words">{selectedEvent.title}</h3>
+          </div>
+          <button on:click={closeEventDetails} class="p-3 bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div class="space-y-8 overflow-y-auto max-h-[60vh] no-scrollbar pr-1">
+          {#if selectedEvent.description}
+            <section>
+              <div class="flex items-center gap-2 mb-3">
+                <Info size={14} class="text-indigo-500" />
+                <h4 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Notes</h4>
+              </div>
+              <p class="text-sm text-slate-600 font-medium leading-relaxed bg-slate-50 p-5 rounded-3xl border border-white">
+                {selectedEvent.description}
+              </p>
+            </section>
+          {/if}
+
+          {#if selectedEvent.location}
+            <section>
+              <div class="flex items-center gap-2 mb-3">
+                <MapPin size={14} class="text-indigo-500" />
+                <h4 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Location</h4>
+              </div>
+              <div class="flex items-start gap-4 p-5 bg-white rounded-3xl border border-slate-100 shadow-sm relative group/loc">
+                <div class="p-2.5 bg-rose-50 rounded-2xl text-rose-500">
+                  <MapPin size={20} />
+                </div>
+                <div class="flex-1 min-w-0">
+                  {#if selectedEvent.location.name}
+                    <p class="text-sm font-black text-slate-800 truncate">{selectedEvent.location.name}</p>
+                    <p class="text-[11px] text-slate-400 font-bold break-words mt-0.5">{selectedEvent.location.address}</p>
+                  {:else}
+                    <p class="text-sm font-black text-slate-800 break-words">{selectedEvent.location.address}</p>
+                  {/if}
+                </div>
+                <div class="flex items-center gap-1">
+                  <a 
+                    href="https://www.google.com/maps/search/?api=1&query={encodeURIComponent(selectedEvent.location.address || selectedEvent.location.name || '')}"
+                    target="_blank"
+                    class="p-3 text-slate-300 hover:text-indigo-600 transition-colors"
+                    title="Open in Maps"
+                  >
+                    <ExternalLink size={18} />
+                  </a>
+                  <button 
+                    on:click={() => handleDeleteLocation(selectedEvent?.location?.id || '')}
+                    disabled={deletingLocationId === selectedEvent?.location?.id}
+                    class="p-3 text-slate-300 hover:text-red-500 transition-colors"
+                    title="Remove location"
+                  >
+                    {#if deletingLocationId === selectedEvent?.location?.id}
+                      <Loader2 size={18} class="animate-spin" />
+                    {:else}
+                      <Trash2 size={18} />
+                    {/if}
+                  </button>
+                </div>
+              </div>
+            </section>
+          {/if}
+
+          {#if selectedEvent.attachments && selectedEvent.attachments.length > 0}
+            <section>
+              <div class="flex items-center gap-2 mb-3">
+                <Paperclip size={14} class="text-indigo-500" />
+                <h4 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Attachments</h4>
+              </div>
+              <div class="grid grid-cols-1 gap-3">
+                {#each selectedEvent.attachments as attachment (attachment.id)}
+                  <div class="flex gap-2">
+                    <a 
+                      href={attachment.fileUrl} 
+                      target="_blank" 
+                      class="flex-1 flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-white shadow-sm hover:bg-indigo-50 hover:border-indigo-100 transition-all overflow-hidden"
+                    >
+                      <div class="bg-white p-2.5 rounded-xl shadow-sm text-indigo-500">
+                        <FileText size={18} />
+                      </div>
+                      <div class="flex-1 overflow-hidden">
+                        <span class="text-xs font-black text-slate-700 block truncate">{attachment.fileName}</span>
+                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-tighter mt-0.5 block">{attachment.mimeType.split('/')[1]}</span>
+                      </div>
+                    </a>
+                    <button 
+                      on:click|preventDefault={() => handleDeleteAttachment(attachment.id)}
+                      disabled={deletingAttachmentId === attachment.id}
+                      class="bg-red-50 border border-red-100 p-4 rounded-2xl shadow-sm text-red-500 hover:bg-red-100 transition-all active:scale-90 flex items-center justify-center disabled:opacity-50"
+                      title="Delete file"
+                    >
+                      {#if deletingAttachmentId === attachment.id}
+                        <Loader2 size={18} class="animate-spin" />
+                      {:else}
+                        <Trash2 size={18} />
+                      {/if}
+                    </button>
+                  </div>
+                {/each}
+              </div>
+            </section>
+          {/if}
+        </div>
+      </div>
+    </div>
   {/if}
 </div>
 

@@ -20,7 +20,7 @@ export interface Event {
   title: string;
   time?: string;
   description?: string;
-  location?: Omit<Location, 'id' | 'eventId'>;
+  location?: Location;
   attachments?: Attachment[];
 }
 
@@ -65,7 +65,12 @@ export const api = {
     return res.json();
   },
 
-  createEvent: async (event: Omit<Event, 'id' | 'attachments'>, files?: File[]): Promise<Event> => {
+  createEvent: async (
+    event: Omit<Event, 'id' | 'attachments' | 'location'> & { 
+      location?: Omit<Location, 'id' | 'eventId'> 
+    }, 
+    files?: File[]
+  ): Promise<Event> => {
     const formData = new FormData();
     formData.append('dayId', event.dayId);
     formData.append('title', event.title);
@@ -99,6 +104,24 @@ export const api = {
     });
     if (!res.ok) {
       throw new Error('Failed to delete attachment');
+    }
+  },
+
+  deleteLocation: async (id: string): Promise<void> => {
+    const res = await fetch(`/api/locations/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      throw new Error('Failed to delete location');
+    }
+  },
+
+  deleteEvent: async (id: string): Promise<void> => {
+    const res = await fetch(`/api/events/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      throw new Error('Failed to delete event');
     }
   },
 

@@ -48,7 +48,10 @@ export async function GET({ url, locals }) {
 					.limit(1)
 					.get();
 				
-				const location = locationSnapshot.empty ? null : locationSnapshot.docs[0].data();
+				const location = locationSnapshot.empty ? null : {
+					id: locationSnapshot.docs[0].id,
+					...locationSnapshot.docs[0].data()
+				};
 
 				// Fetch attachments for this event
 				const attachmentSnapshot = await adminDb
@@ -111,8 +114,8 @@ export async function POST({ request, locals }) {
 	const formData = await request.formData();
 	const dayId = formData.get('dayId') as string;
 	const title = formData.get('title') as string;
-	const time = formData.get('time') as string;
-	const description = formData.get('description') as string;
+	const time = formData.get('time') as string || undefined;
+	const description = formData.get('description') as string || undefined;
 	const locationRaw = formData.get('location') as string;
 	const files = formData.getAll('files') as File[];
 
