@@ -202,7 +202,7 @@
     </header>
 
     <main class="max-w-md mx-auto p-4 pt-6">
-      <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-50 min-h-[60vh]" in:fly={{ y: 20 }}>
+      <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-50" in:fly={{ y: 20 }}>
         <div class="mb-8 flex justify-between items-end">
           <div>
             <p class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-1">Current Date</p>
