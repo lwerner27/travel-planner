@@ -1,5 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import { adminDb } from '$lib/server/firebase-admin';
+import { tripSchema } from '$lib/schemas';
 
 export async function GET({ locals }) {
 	if (!locals.user) {
@@ -48,7 +49,14 @@ export async function POST({ request, locals }) {
 		throw error(401, 'Unauthorized');
 	}
 
-	const { title, startDate, endDate } = await request.json();
+	const body = await request.json();
+	const validation = tripSchema.safeParse(body);
+
+	if (!validation.success) {
+		throw error(400, { message: 'Validation failed', errors: validation.error.flatten() } as any);
+	}
+
+	const { title, startDate, endDate } = validation.data;
 
 	const tripData = {
 		userId: locals.user.uid,

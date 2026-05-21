@@ -1,5 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import { adminDb } from '$lib/server/firebase-admin';
+import { eventSchema } from '$lib/schemas';
 
 async function checkTripOwnership(tripId: string, userId: string) {
 	const doc = await adminDb.collection('trips').doc(tripId).get();
@@ -64,7 +65,14 @@ export async function GET({ url, locals }) {
 export async function POST({ request, locals }) {
 	if (!locals.user) throw error(401, 'Unauthorized');
 
-	const { dayId, title, time, description } = await request.json();
+	const body = await request.json();
+	const validation = eventSchema.safeParse(body);
+
+	if (!validation.success) {
+		throw error(400, { message: 'Validation failed', errors: validation.error.flatten() } as any);
+	}
+
+	const { dayId, title, time, description } = validation.data;
 
 	const parts = dayId.split('-');
 	if (parts.length < 4) {

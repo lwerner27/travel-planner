@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import { adminDb, adminStorage } from '$lib/server/firebase-admin';
 import { PUBLIC_FIREBASE_STORAGE_BUCKET } from '$env/static/public';
+import { attachmentSchema } from '$lib/schemas';
 
 async function checkTripOwnership(tripId: string, userId: string) {
 	const doc = await adminDb.collection('trips').doc(tripId).get();
@@ -31,10 +32,32 @@ export async function GET({ url, locals }) {
 			.where('date', '==', date)
 			.get();
 
-		const attachments = snapshot.docs.map((doc) => ({
-			id: doc.id,
-			...doc.data()
-		}));
+		const bucket = adminStorage.bucket(PUBLIC_FIREBASE_STORAGE_BUCKET);
+		const attachments = await Promise.all(
+			snapshot.docs.map(async (doc) => {
+				const data = doc.data();
+				let fileUrl = data.fileUrl;
+
+				if (data.storagePath) {
+					try {
+						const [url] = await bucket.file(data.storagePath).getSignedUrl({
+							version: 'v4',
+							action: 'read',
+							expires: Date.now() + 15 * 60 * 1000 // 15 minutes
+						});
+						fileUrl = url;
+					} catch (signErr) {
+						console.error('Error signing URL:', signErr);
+					}
+				}
+
+				return {
+					id: doc.id,
+					...data,
+					fileUrl
+				};
+			})
+		);
 
 		return json(attachments);
 	} catch (err) {
@@ -48,13 +71,23 @@ export async function POST({ request, locals }) {
 
 	const formData = await request.formData();
 	const file = formData.get('file') as File;
-	const dayId = formData.get('dayId') as string;
-	const fileName = formData.get('fileName') as string;
-	const mimeType = formData.get('mimeType') as string;
+	
+	const data = {
+		dayId: formData.get('dayId') as string,
+		fileName: formData.get('fileName') as string,
+		mimeType: formData.get('mimeType') as string
+	};
 
-	if (!file || !dayId) {
-		throw error(400, 'Missing file or dayId');
+	const validation = attachmentSchema.safeParse(data);
+	if (!validation.success) {
+		throw error(400, { message: 'Validation failed', errors: validation.error.flatten() } as any);
 	}
+
+	if (!file) {
+		throw error(400, 'Missing file');
+	}
+
+	const { dayId, fileName, mimeType } = validation.data;
 
 	const parts = dayId.split('-');
 	if (parts.length < 4) {
@@ -84,18 +117,18 @@ export async function POST({ request, locals }) {
 			metadata: { contentType: mimeType }
 		});
 
-		// Make the file public
-		await blob.makePublic();
-
-		// Construct the public URL manually
-		const fileUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+		// Generate a signed URL for the response (15 minutes expiry)
+		const [signedUrl] = await blob.getSignedUrl({
+			version: 'v4',
+			action: 'read',
+			expires: Date.now() + 15 * 60 * 1000
+		});
 
 		const attachmentData = {
 			tripId,
 			date,
 			fileName,
 			mimeType,
-			fileUrl,
 			storagePath
 		};
 
@@ -105,7 +138,7 @@ export async function POST({ request, locals }) {
 			.collection('attachments')
 			.add(attachmentData);
 
-		return json({ id: docRef.id, ...attachmentData });
+		return json({ id: docRef.id, ...attachmentData, fileUrl: signedUrl });
 	} catch (err) {
 		console.error('Error during attachment creation:', err);
 		throw error(500, `Failed to create attachment: ${err instanceof Error ? err.message : 'Unknown error'}`);

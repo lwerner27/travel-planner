@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Deny all client-side read and write access.
+    // All access is managed via the Server Admin SDK (Signed URLs for reading, Admin SDK for writing/deleting).
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
