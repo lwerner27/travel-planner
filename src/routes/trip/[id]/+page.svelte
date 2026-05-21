@@ -337,35 +337,35 @@
                 <MapPin size={14} class="text-indigo-500" />
                 <h4 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Location</h4>
               </div>
-              <div class="flex items-start gap-4 p-5 bg-white rounded-3xl border border-slate-100 shadow-sm relative group/loc">
-                <div class="p-2.5 bg-rose-50 rounded-2xl text-rose-500">
-                  <MapPin size={20} />
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-black text-slate-800 break-words">{selectedEvent.location.address}</p>
-                </div>
-                <div class="flex items-center gap-1">
+              <div class="flex gap-2">
+                <div class="flex-1 flex items-start gap-4 p-5 bg-white rounded-3xl border border-slate-100 shadow-sm relative">
+                  <div class="p-2.5 bg-rose-50 rounded-2xl text-rose-500">
+                    <MapPin size={20} />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-black text-slate-800 break-words">{selectedEvent.location.address}</p>
+                  </div>
                   <a 
                     href="https://www.google.com/maps/search/?api=1&query={encodeURIComponent(selectedEvent.location.address || '')}"
                     target="_blank"
-                    class="p-3 text-slate-300 hover:text-indigo-600 transition-colors"
+                    class="p-3 bg-indigo-50 rounded-2xl text-indigo-600 hover:bg-indigo-100 transition-colors"
                     title="Open in Maps"
                   >
                     <ExternalLink size={18} />
                   </a>
-                  <button 
-                    on:click={() => handleDeleteLocation(selectedEvent?.location?.id || '')}
-                    disabled={deletingLocationId === selectedEvent?.location?.id}
-                    class="p-3 text-slate-300 hover:text-red-500 transition-colors"
-                    title="Remove location"
-                  >
-                    {#if deletingLocationId === selectedEvent?.location?.id}
-                      <Loader2 size={18} class="animate-spin" />
-                    {:else}
-                      <Trash2 size={18} />
-                    {/if}
-                  </button>
                 </div>
+                <button 
+                  on:click={() => handleDeleteLocation(selectedEvent?.location?.id || '')}
+                  disabled={deletingLocationId === selectedEvent?.location?.id}
+                  class="bg-red-50 border border-red-100 p-5 rounded-3xl shadow-sm text-red-500 hover:bg-red-100 transition-all active:scale-90 flex items-center justify-center disabled:opacity-50"
+                  title="Remove location"
+                >
+                  {#if deletingLocationId === selectedEvent?.location?.id}
+                    <Loader2 size={20} class="animate-spin" />
+                  {:else}
+                    <Trash2 size={20} />
+                  {/if}
+                </button>
               </div>
             </section>
           {/if}
