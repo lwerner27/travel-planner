@@ -236,27 +236,29 @@
               <div class="relative group" transition:slide>
                 <button 
                   on:click={() => openEventDetails(event)}
-                  class="w-full text-left p-5 bg-slate-50 rounded-2xl border border-white shadow-sm hover:border-indigo-100 hover:bg-indigo-50 transition-all flex items-start gap-4 active:scale-[0.98]" 
+                  class="w-full text-left p-5 bg-slate-50 rounded-2xl border border-white shadow-sm hover:border-indigo-100 hover:bg-indigo-50 transition-all flex items-center gap-4 active:scale-[0.98]" 
                 >
                   <div class="flex-1 min-w-0">
-                    {#if event.time}
-                      <span class="inline-block text-[10px] font-black text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-md uppercase tracking-wider mb-2">
-                        {event.time}
-                      </span>
-                    {/if}
+                    <div class="flex items-center gap-2 mb-1.5">
+                      {#if event.time}
+                        <span class="inline-block text-[10px] font-black text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                          {event.time}
+                        </span>
+                      {/if}
+                      <div class="flex items-center gap-1.5 text-slate-300">
+                        {#if event.location}
+                          <MapPin size={12} />
+                        {/if}
+                        {#if event.attachments && event.attachments.length > 0}
+                          <Paperclip size={12} />
+                        {/if}
+                      </div>
+                    </div>
                     <h4 class="font-black text-slate-800 leading-tight text-lg break-words">
                       {event.title}
                     </h4>
                   </div>
-                  <div class="flex items-center gap-2 text-slate-300 mt-1">
-                    {#if event.location}
-                      <MapPin size={14} />
-                    {/if}
-                    {#if event.attachments && event.attachments.length > 0}
-                      <Paperclip size={14} />
-                    {/if}
-                    <ChevronLeft size={16} class="rotate-180 text-slate-400 ml-1" />
-                  </div>
+                  <ChevronLeft size={16} class="rotate-180 text-slate-300 flex-shrink-0" />
                 </button>
               </div>
             {/each}
