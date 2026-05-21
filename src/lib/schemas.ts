@@ -15,17 +15,12 @@ export const eventSchema = z.object({
 	time: z.string().optional().or(z.literal('')),
 	description: z.string().optional().or(z.literal('')),
 	location: z.object({
-		name: z.string().optional().or(z.literal('')),
-		address: z.string().optional().or(z.literal(''))
-	}).optional().refine(data => !data || data.name || data.address, {
-		message: "Location must have either a name or an address",
-		path: ["name"]
-	})
+		address: z.string().min(1, 'Address is required')
+	}).optional()
 });
 
 export const locationSchema = z.object({
 	eventId: z.string().min(1),
-	name: z.string().optional().or(z.literal('')),
 	address: z.string().min(1, 'Address is required')
 });
 

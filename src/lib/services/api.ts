@@ -27,7 +27,6 @@ export interface Event {
 export interface Location {
   id: string;
   eventId: string;
-  name: string;
   address: string;
 }
 

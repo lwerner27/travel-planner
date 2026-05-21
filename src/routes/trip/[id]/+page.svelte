@@ -243,7 +243,7 @@
                       {event.time}
                     </span>
                   {/if}
-                  <div class="flex-1 min-w-0 pr-8">
+                  <div class="flex-1 min-w-0">
                     <h4 class="font-black text-slate-800 truncate">{event.title}</h4>
                   </div>
                   <div class="flex items-center gap-2 text-slate-300">
@@ -255,20 +255,6 @@
                     {/if}
                     <ChevronLeft size={16} class="rotate-180 text-slate-400 ml-1" />
                   </div>
-                </button>
-                
-                <!-- Event Delete Button -->
-                <button 
-                  on:click|stopPropagation={() => handleDeleteEvent(event.id)}
-                  disabled={deletingEventId === event.id}
-                  class="absolute right-12 top-1/2 -translate-y-1/2 p-2 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                  title="Delete event"
-                >
-                  {#if deletingEventId === event.id}
-                    <Loader2 size={16} class="animate-spin" />
-                  {:else}
-                    <Trash2 size={16} />
-                  {/if}
                 </button>
               </div>
             {/each}
@@ -311,9 +297,23 @@
             </div>
             <h3 class="text-3xl font-black text-slate-900 leading-tight break-words">{selectedEvent.title}</h3>
           </div>
-          <button on:click={closeEventDetails} class="p-3 bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-            <X size={20} />
-          </button>
+          <div class="flex items-center gap-2">
+            <button 
+              on:click={() => handleDeleteEvent(selectedEvent?.id || '')}
+              disabled={deletingEventId === selectedEvent?.id}
+              class="p-3 bg-red-50 rounded-2xl text-red-400 hover:text-red-600 hover:bg-red-100 transition-colors"
+              title="Delete Event"
+            >
+              {#if deletingEventId === selectedEvent?.id}
+                <Loader2 size={20} class="animate-spin" />
+              {:else}
+                <Trash2 size={20} />
+              {/if}
+            </button>
+            <button on:click={closeEventDetails} class="p-3 bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <div class="space-y-8 overflow-y-auto max-h-[60vh] no-scrollbar pr-1">
@@ -340,16 +340,11 @@
                   <MapPin size={20} />
                 </div>
                 <div class="flex-1 min-w-0">
-                  {#if selectedEvent.location.name}
-                    <p class="text-sm font-black text-slate-800 truncate">{selectedEvent.location.name}</p>
-                    <p class="text-[11px] text-slate-400 font-bold break-words mt-0.5">{selectedEvent.location.address}</p>
-                  {:else}
-                    <p class="text-sm font-black text-slate-800 break-words">{selectedEvent.location.address}</p>
-                  {/if}
+                  <p class="text-sm font-black text-slate-800 break-words">{selectedEvent.location.address}</p>
                 </div>
                 <div class="flex items-center gap-1">
                   <a 
-                    href="https://www.google.com/maps/search/?api=1&query={encodeURIComponent(selectedEvent.location.address || selectedEvent.location.name || '')}"
+                    href="https://www.google.com/maps/search/?api=1&query={encodeURIComponent(selectedEvent.location.address || '')}"
                     target="_blank"
                     class="p-3 text-slate-300 hover:text-indigo-600 transition-colors"
                     title="Open in Maps"

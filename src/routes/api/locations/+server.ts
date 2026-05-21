@@ -48,7 +48,7 @@ export async function POST({ request, locals }) {
 		throw error(400, { message: 'Validation failed', errors: validation.error.flatten() } as any);
 	}
 
-	const { eventId, name, address } = validation.data;
+	const { eventId, address } = validation.data;
 	const { dayId } = body;
 
 	const parts = dayId.split('-');
@@ -65,7 +65,6 @@ export async function POST({ request, locals }) {
 		const locationData = {
 			tripId,
 			date,
-			name,
 			address
 		};
 		const docRef = await adminDb

@@ -13,7 +13,6 @@
   let title = '';
   let time = '';
   let description = '';
-  let locationName = '';
   let locationAddress = '';
   let files: File[] = [];
   let submitting = false;
@@ -40,7 +39,7 @@
         title,
         time: time || undefined,
         description: description || undefined,
-        location: locationName ? { name: locationName, address: locationAddress } : undefined
+        location: locationAddress ? { address: locationAddress } : undefined
       };
 
       await api.createEvent(eventData, files);
@@ -124,16 +123,7 @@
           <div>
             <input 
               type="text" 
-              placeholder="Place Name (e.g. Ichiraku Ramen)" 
-              bind:value={locationName}
-              class="w-full px-6 py-4 bg-slate-50 border border-transparent rounded-2xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300"
-            />
-          </div>
-          
-          <div>
-            <input 
-              type="text" 
-              placeholder="Address" 
+              placeholder="Address or Place Name" 
               bind:value={locationAddress}
               class="w-full px-6 py-4 bg-slate-50 border border-transparent rounded-2xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300"
             />
