@@ -87,7 +87,8 @@ export async function POST({ request, locals }) {
 		throw error(400, 'Missing file');
 	}
 
-	const { dayId, fileName, mimeType } = validation.data;
+	const { eventId, fileName, mimeType } = validation.data;
+	const dayId = formData.get('dayId') as string;
 
 	const parts = dayId.split('-');
 	if (parts.length < 4) {

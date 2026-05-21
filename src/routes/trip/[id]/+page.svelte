@@ -15,7 +15,8 @@
     Upload, 
     MoreHorizontal,
     Trash2,
-    Loader2
+    Loader2,
+    ExternalLink
   } from 'lucide-svelte';
   
   $: id = $page.params.id;
@@ -25,11 +26,7 @@
   let days: Date[] = [];
   let selectedDayIndex = 0;
   let events: Event[] = [];
-  let locations: Location[] = [];
-  let attachments: Attachment[] = [];
   let loadingEvents = false;
-  let loadingLocations = false;
-  let loadingAttachments = false;
   let deletingAttachmentId: string | null = null;
   let deletingTrip = false;
 
@@ -38,29 +35,15 @@
   async function fetchDayData(date: string | null) {
     if (!date) return;
     loadingEvents = true;
-    loadingLocations = true;
-    loadingAttachments = true;
     
     const dayId = `${id}-${date}`;
     try {
-      const [e, l, a] = await Promise.all([
-        api.getEvents(dayId),
-        api.getLocations(dayId),
-        api.getAttachments(dayId)
-      ]);
-      // Update state only if we haven't switched dates while loading
-      if (date === selectedDate) {
-        events = e;
-        locations = l;
-        attachments = a;
-      }
+      events = await api.getEvents(dayId);
     } catch (err) {
       console.error('Error fetching day data:', err);
     }
     
     loadingEvents = false;
-    loadingLocations = false;
-    loadingAttachments = false;
   }
 
   async function handleDeleteAttachment(attachmentId: string) {
@@ -69,9 +52,7 @@
     deletingAttachmentId = attachmentId;
     try {
       await api.deleteAttachment(attachmentId);
-      // Optimistically update UI
-      attachments = attachments.filter(a => a.id !== attachmentId);
-      // Then re-fetch to be absolutely sure
+      // Re-fetch to update the nested state
       await fetchDayData(selectedDate);
     } catch (e) {
       alert('Failed to delete file');
@@ -170,176 +151,101 @@
 
     <main class="max-w-md mx-auto p-4 pt-6">
       <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-50 min-h-[60vh]" in:fly={{ y: 20 }}>
-        <div class="mb-8">
-          <p class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-1">Current Date</p>
-          <h2 class="text-3xl font-black text-slate-900">
-            {days[selectedDayIndex] ? formatDisplayDate(days[selectedDayIndex]) : 'Select a day'}
-          </h2>
+        <div class="mb-8 flex justify-between items-end">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-1">Current Date</p>
+            <h2 class="text-3xl font-black text-slate-900">
+              {days[selectedDayIndex] ? formatDisplayDate(days[selectedDayIndex]) : 'Select a day'}
+            </h2>
+          </div>
+          <a 
+            href="/trip/{id}/add-event?date={selectedDate}" 
+            class="bg-indigo-600 text-white p-4 rounded-2xl shadow-lg shadow-indigo-100 active:scale-95 transition-all"
+          >
+            <Plus size={24} strokeWidth={3} />
+          </a>
         </div>
 
-        <div class="space-y-10">
-          <!-- Events Section -->
-          <section>
-            <div class="flex justify-between items-center mb-6">
-              <div class="flex items-center gap-2">
-                <div class="p-1.5 bg-indigo-50 rounded-lg">
-                  <Clock size={16} class="text-indigo-600" />
-                </div>
-                <h3 class="font-black text-slate-800 uppercase text-xs tracking-widest">Events</h3>
+        <div class="space-y-6">
+          {#if loadingEvents}
+            {#each Array(3) as _}
+              <div class="p-6 bg-slate-50 rounded-3xl animate-pulse space-y-3">
+                <div class="h-4 bg-slate-200 rounded w-1/4"></div>
+                <div class="h-6 bg-slate-200 rounded w-3/4"></div>
               </div>
-              <a 
-                href="/trip/{id}/add-event?date={selectedDate}" 
-                class="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-indigo-100 transition-colors"
-              >
-                <Plus size={12} strokeWidth={3} />
-                Add
-              </a>
+            {/each}
+          {:else if events.length === 0}
+            <div class="text-center py-20 bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-100" in:fade>
+              <Calendar class="mx-auto mb-4 text-slate-200" size={48} />
+              <p class="text-sm font-black text-slate-400 uppercase tracking-widest">Itinerary Empty</p>
+              <p class="text-xs text-slate-400 mt-2">Tap the + button to start planning</p>
             </div>
-            
-            {#if loadingEvents}
-              <div class="flex gap-4 p-4 animate-pulse">
-                <div class="w-10 h-4 bg-slate-100 rounded"></div>
-                <div class="flex-1 space-y-2">
-                  <div class="w-2/3 h-4 bg-slate-100 rounded"></div>
-                  <div class="w-1/2 h-3 bg-slate-100 rounded"></div>
-                </div>
-              </div>
-            {:else if events.length === 0}
-              <div class="text-center py-8 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-100" in:fade>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Nothing planned yet</p>
-              </div>
-            {:else}
-              <div class="space-y-4">
-                {#each events as event (event.id)}
-                  <div class="flex gap-4 p-4 bg-slate-50 rounded-2xl border border-white shadow-sm" transition:slide>
-                    {#if event.time}
-                      <span class="text-xs font-black text-indigo-600 pt-1">{event.time}</span>
-                    {/if}
-                    <div class="flex-1">
-                      <h4 class="font-black text-slate-800 leading-tight">{event.title}</h4>
-                      {#if event.description}
-                        <p class="text-xs text-slate-500 mt-1.5 font-medium leading-relaxed">{event.description}</p>
+          {:else}
+            {#each events as event (event.id)}
+              <div class="relative group" transition:slide>
+                <div class="p-6 bg-slate-50 rounded-[2rem] border border-white shadow-sm hover:shadow-md transition-shadow">
+                  <div class="flex justify-between items-start mb-4">
+                    <div class="flex items-center gap-3">
+                      {#if event.time}
+                        <div class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-wider">
+                          {event.time}
+                        </div>
                       {/if}
+                      <h4 class="text-lg font-black text-slate-800">{event.title}</h4>
                     </div>
                   </div>
-                {/each}
-              </div>
-            {/if}
-          </section>
 
-          <!-- Locations Section -->
-          <section>
-            <div class="flex justify-between items-center mb-6">
-              <div class="flex items-center gap-2">
-                <div class="p-1.5 bg-indigo-50 rounded-lg">
-                  <MapPin size={16} class="text-indigo-600" />
-                </div>
-                <h3 class="font-black text-slate-800 uppercase text-xs tracking-widest">Locations</h3>
-              </div>
-              <a 
-                href="/trip/{id}/add-location?date={selectedDate}" 
-                class="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-indigo-100 transition-colors"
-              >
-                <Plus size={12} strokeWidth={3} />
-                Pin
-              </a>
-            </div>
-            
-            {#if loadingLocations}
-              <div class="p-4 animate-pulse space-y-2">
-                <div class="w-1/2 h-4 bg-slate-100 rounded"></div>
-                <div class="w-full h-3 bg-slate-100 rounded"></div>
-              </div>
-            {:else if locations.length === 0}
-              <div class="text-center py-8 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-100" in:fade>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">No places pinned</p>
-              </div>
-            {:else}
-              <div class="space-y-4">
-                {#each locations as location (location.id)}
-                  <a 
-                    href="https://www.google.com/maps/search/?api=1&query={encodeURIComponent(location.address || location.name)}"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="block p-4 bg-slate-50 rounded-2xl border border-white shadow-sm group hover:border-indigo-100 hover:bg-indigo-50 transition-all" 
-                    transition:slide
-                  >
-                    <div class="flex items-start justify-between">
-                      <h4 class="font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{location.name}</h4>
+                  {#if event.description}
+                    <p class="text-sm text-slate-500 font-medium mb-4 leading-relaxed">
+                      {event.description}
+                    </p>
+                  {/if}
+
+                  {#if event.location}
+                    <div class="flex items-start gap-3 p-3 bg-white rounded-2xl border border-slate-100 mb-4">
+                      <div class="p-2 bg-rose-50 rounded-xl text-rose-500">
+                        <MapPin size={18} />
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-xs font-black text-slate-800 truncate">{event.location.name}</p>
+                        <p class="text-[10px] text-slate-400 font-bold truncate">{event.location.address}</p>
+                      </div>
+                      <a 
+                        href="https://www.google.com/maps/search/?api=1&query={encodeURIComponent(event.location.address || event.location.name)}"
+                        target="_blank"
+                        class="p-2 text-slate-300 hover:text-indigo-500 transition-colors"
+                      >
+                        <ExternalLink size={16} />
+                      </a>
                     </div>
-                    {#if location.address}
-                      <p class="text-xs text-slate-500 mt-1.5 font-medium flex items-start gap-1">
-                        <MapPin size={10} class="mt-0.5 text-slate-400 group-hover:text-indigo-400" />
-                        {location.address}
-                      </p>
-                    {/if}
-                  </a>
-                {/each}
-              </div>
-            {/if}
-          </section>
+                  {/if}
 
-          <!-- Attachments Section -->
-          <section>
-            <div class="flex justify-between items-center mb-6">
-              <div class="flex items-center gap-2">
-                <div class="p-1.5 bg-indigo-50 rounded-lg">
-                  <FileText size={16} class="text-indigo-600" />
+                  {#if event.attachments && event.attachments.length > 0}
+                    <div class="flex flex-wrap gap-2">
+                      {#each event.attachments as attachment (attachment.id)}
+                        <div class="flex items-center gap-2 bg-white border border-slate-100 pl-3 pr-2 py-2 rounded-xl group/file">
+                          <FileText size={14} class="text-indigo-400" />
+                          <a 
+                            href={attachment.fileUrl} 
+                            target="_blank" 
+                            class="text-[10px] font-black text-slate-600 truncate max-w-[120px] hover:text-indigo-600 transition-colors"
+                          >
+                            {attachment.fileName}
+                          </a>
+                          <button 
+                            on:click|preventDefault={() => handleDeleteAttachment(attachment.id)}
+                            class="p-1 text-slate-200 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
                 </div>
-                <h3 class="font-black text-slate-800 uppercase text-xs tracking-widest">Tickets & Files</h3>
               </div>
-              <a 
-                href="/trip/{id}/upload-attachment?date={selectedDate}" 
-                class="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-indigo-100 transition-colors"
-              >
-                <Upload size={12} strokeWidth={3} />
-                Upload
-              </a>
-            </div>
-            
-            {#if loadingAttachments}
-              <div class="flex items-center gap-3 p-4 animate-pulse">
-                <div class="w-8 h-8 bg-slate-100 rounded-lg"></div>
-                <div class="w-2/3 h-4 bg-slate-100 rounded"></div>
-              </div>
-            {:else if attachments.length === 0}
-              <div class="text-center py-8 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-100" in:fade>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">No documents saved</p>
-              </div>
-            {:else}
-              <div class="grid grid-cols-1 gap-3">
-                {#each attachments as attachment (attachment.id)}
-                  <div class="flex gap-2" transition:slide>
-                    <a 
-                      href={attachment.fileUrl} 
-                      target="_blank" 
-                      class="flex-1 flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-white shadow-sm hover:bg-indigo-50 hover:border-indigo-100 transition-all overflow-hidden"
-                    >
-                      <div class="bg-white p-2.5 rounded-xl shadow-sm">
-                        <FileText size={18} class="text-indigo-500" />
-                      </div>
-                      <div class="flex-1 overflow-hidden">
-                        <span class="text-xs font-black text-slate-700 block truncate">{attachment.fileName}</span>
-                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-tighter mt-0.5 block">{attachment.mimeType.split('/')[1]}</span>
-                      </div>
-                    </a>
-                    <button 
-                      on:click|preventDefault={() => handleDeleteAttachment(attachment.id)}
-                      disabled={deletingAttachmentId === attachment.id}
-                      class="bg-red-50 border border-red-100 p-4 rounded-2xl shadow-sm text-red-500 hover:bg-red-100 transition-all active:scale-90 flex items-center justify-center disabled:opacity-50"
-                      title="Delete file"
-                    >
-                      {#if deletingAttachmentId === attachment.id}
-                        <Loader2 size={18} class="animate-spin" />
-                      {:else}
-                        <Trash2 size={18} />
-                      {/if}
-                    </button>
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          </section>
+            {/each}
+          {/if}
         </div>
       </div>
     </main>

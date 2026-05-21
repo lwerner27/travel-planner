@@ -48,7 +48,8 @@ export async function POST({ request, locals }) {
 		throw error(400, { message: 'Validation failed', errors: validation.error.flatten() } as any);
 	}
 
-	const { dayId, name, address } = validation.data;
+	const { eventId, name, address } = validation.data;
+	const { dayId } = body;
 
 	const parts = dayId.split('-');
 	if (parts.length < 4) {

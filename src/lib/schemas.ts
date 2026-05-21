@@ -13,17 +13,21 @@ export const eventSchema = z.object({
 	dayId: z.string().min(1),
 	title: z.string().min(1, 'Title is required').max(100),
 	time: z.string().optional(),
-	description: z.string().optional()
+	description: z.string().optional(),
+	location: z.object({
+		name: z.string().min(1, 'Name is required').max(100),
+		address: z.string().min(1, 'Address is required')
+	}).optional()
 });
 
 export const locationSchema = z.object({
-	dayId: z.string().min(1),
+	eventId: z.string().min(1),
 	name: z.string().min(1, 'Name is required').max(100),
 	address: z.string().min(1, 'Address is required')
 });
 
 export const attachmentSchema = z.object({
-	dayId: z.string().min(1),
+	eventId: z.string().min(1),
 	fileName: z.string().min(1),
 	mimeType: z.string().min(1)
 });
