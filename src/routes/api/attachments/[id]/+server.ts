@@ -44,7 +44,7 @@ export async function DELETE({ params, locals }) {
 		console.error('Error deleting attachment:', err);
 		// Check for missing index error in collectionGroup query
 		if (err instanceof Error && err.message.includes('FAILED_PRECONDITION')) {
-			console.error('Firestore Collection Group Index required for attachments. Link: https://console.firebase.google.com/v1/r/project/travel-planner-1f414/firestore/indexes?create_composite=ClJwcm9qZWN0cy90cmF2ZWwtcGxhbm5lci0xZjQxNC9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYXR0YWNobWVudHMvaW5kZXhlcy9fEAAaDAoIX19uYW1lX18QAQ');
+			console.error('Firestore Collection Group Index required for attachments. Please create it in the Firebase Console.');
 		}
 		if ((err as any).status) throw err;
 		throw error(500, 'Failed to delete attachment');
