@@ -1,12 +1,5 @@
 [build]
   command = "npm run build"
-  publish = "build"
 
 [functions]
-  node_bundle = true
   external_node_modules = ["firebase-admin"]
-
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/handler"
-  status = 200
